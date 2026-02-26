@@ -302,7 +302,7 @@ pub fn launch_at_login_enabled() -> bool {
         Command::new("osascript")
             .args(["-e", script])
             .output()
-            .map_or(false, |o| String::from_utf8_lossy(&o.stdout).contains("QuillFix"))
+            .is_ok_and(|o| String::from_utf8_lossy(&o.stdout).contains("QuillFix"))
     }
     #[cfg(not(target_os = "macos"))]
     {

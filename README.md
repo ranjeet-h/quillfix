@@ -57,3 +57,7 @@ cargo build --release --features local-llm
 - `resources/model/` is gitignored.
 - `build.rs` links required macOS frameworks for AppKit/CoreGraphics/AX APIs.
 - `make check-all-llm` runs lint/test/build with `--features local-llm` (requires full Xcode + Metal tools).
+
+
+
+pkill -x quillfix; sleep 1 && bash scripts/bundle.sh && open QuillFix.app

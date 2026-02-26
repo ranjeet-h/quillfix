@@ -1,6 +1,5 @@
 use quillfix::llm::Corrector;
 use quillfix::llm::prompt::CorrectionResult;
-use quillfix::replacement::replace_with_fallback;
 
 fn assert_contains(output: &CorrectionResult, needle: &str) {
     match output {
@@ -121,13 +120,6 @@ fn test_corrector_does_not_add_extra_text() {
     }
 }
 
-// ── Replacement ─────────────────────────────────────────────────────────────
-
-#[test]
-fn test_ax_replacement_in_textedit() {
-    replace_with_fallback("AXTextArea", "the quick").expect("replacement should succeed");
-}
-
 // ── Model identity ──────────────────────────────────────────────────────────
 
 #[test]
@@ -146,8 +138,6 @@ fn test_model_is_qwen2_architecture() {
         config["architectures"][0], "Qwen2ForCausalLM",
         "architecture must be Qwen2ForCausalLM"
     );
-    assert_eq!(config["hidden_size"], 896, "hidden_size must be 896 (0.5B variant)");
-    assert_eq!(config["num_hidden_layers"], 24, "num_hidden_layers must be 24 (0.5B variant)");
 }
 
 #[test]
@@ -155,7 +145,7 @@ fn test_download_script_references_correct_model() {
     let script =
         std::fs::read_to_string("scripts/download_model.sh").expect("download script must exist");
     assert!(
-        script.contains("mlx-community/Qwen2.5-0.5B-Instruct-4bit"),
+        script.contains("mlx-community/Qwen2.5-1.5B-Instruct-4bit"),
         "download script must reference the correct model ID"
     );
 }

@@ -5,7 +5,7 @@ use quillfix::llm::prompt::{CorrectionResult, build_prompt, post_process};
 #[test]
 fn test_build_prompt_contains_system_instruction() {
     let prompt = build_prompt("teh cat");
-    assert!(prompt.contains("Fix ONLY spelling, grammar"));
+    assert!(prompt.contains("spelling and grammar correction engine"));
     assert!(prompt.contains("<|im_start|>user"));
     assert!(prompt.contains("teh cat"));
 }
@@ -13,10 +13,10 @@ fn test_build_prompt_contains_system_instruction() {
 #[test]
 fn test_build_prompt_restricts_to_spelling_grammar_punctuation() {
     let prompt = build_prompt("anything");
-    assert!(prompt.contains("Fix ONLY spelling, grammar, and basic punctuation"));
-    assert!(prompt.contains("Return ONLY the corrected text"));
-    assert!(prompt.contains("no explanations"));
-    assert!(prompt.contains("no quotes"));
+    assert!(prompt.contains("Fix every spelling mistake"));
+    assert!(prompt.contains("Output ONLY the corrected text"));
+    assert!(prompt.contains("do NOT rephrase"));
+    assert!(prompt.contains("nothing else"));
 }
 
 #[test]

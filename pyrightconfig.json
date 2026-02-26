@@ -1,0 +1,6 @@
+{
+  "pythonPath": "python-inference/bin/python3",
+  "pythonVersion": "3.13",
+  "typeCheckingMode": "basic",
+  "reportMissingTypeStubs": false
+}

@@ -81,7 +81,7 @@ def main() -> None:
 
     from mlx_lm import load, generate  # noqa: E402 — import after path check
 
-    model, tokenizer = load(model_path)
+    model, tokenizer, *_ = load(model_path)
     stderr_log.write("[quillfix-infer] model loaded, ready for requests\n")
     stderr_log.flush()
 

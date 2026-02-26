@@ -1,11 +1,7 @@
-mod ax_query;
 mod corrector;
-mod debounce;
-mod known_apps;
 mod llm;
 mod menu_bar;
 mod permissions;
-mod replacement;
 
 use tracing_subscriber::prelude::*;
 

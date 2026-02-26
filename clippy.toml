@@ -1,0 +1,7 @@
+msrv = "1.93.0"
+avoid-breaking-exported-api = false
+cognitive-complexity-threshold = 25
+too-many-arguments-threshold = 8
+too-many-lines-threshold = 140
+type-complexity-threshold = 300
+doc-valid-idents = ["AppKit", "CoreGraphics", "AXAPI", "QuillFix", "LLM", "MLX", "Rust"]

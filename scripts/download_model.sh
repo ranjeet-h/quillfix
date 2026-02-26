@@ -2,7 +2,7 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-MODEL_ID="mlx-community/Qwen2.5-0.5B-Instruct-4bit"
+MODEL_ID="mlx-community/Qwen2.5-1.5B-Instruct-4bit"
 TARGET_DIR="$ROOT_DIR/resources/model"
 
 mkdir -p "$TARGET_DIR"

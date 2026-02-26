@@ -1,13 +1,20 @@
 # Phase 4 HOWTO
 
-## Build
+## Build + Run
 
-`cargo build`
+```bash
+bash scripts/bundle.sh
+open QuillFix.app
+```
 
-## Test
+## Manual test
 
-`cargo test`
+- Trigger popup show flow.
+- Verify auto-hide, ESC hide, and success icon flash behavior.
 
-## Notes
+## Run tests
 
-Phase 4 scaffold is present and ready for implementation.
+```bash
+cargo test --test unit_popup --test integration_popup
+bash scripts/run_integration_tests.sh phase4
+```

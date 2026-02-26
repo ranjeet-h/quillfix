@@ -1,13 +1,24 @@
 # Phase 5 HOWTO
 
-## Build
+## Prerequisites
 
-`cargo build`
+- Ensure model files are present in `resources/model/`.
 
-## Test
+## Build + Run
 
-`cargo test`
+```bash
+bash scripts/bundle.sh
+open QuillFix.app
+```
 
-## Notes
+## Manual test
 
-Phase 5 scaffold is present and ready for implementation.
+- Select text `teh quik brwon fox`.
+- Trigger correction and confirm output `the quick brown fox`.
+
+## Run tests
+
+```bash
+cargo test --test unit_prompt --test unit_replacement --test integration_llm
+bash scripts/run_integration_tests.sh phase5
+```

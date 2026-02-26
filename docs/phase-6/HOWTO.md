@@ -1,13 +1,24 @@
 # Phase 6 HOWTO
 
-## Build
+## Build release
 
-`cargo build`
+```bash
+bash scripts/bundle.sh
+```
 
-## Test
+## Run
 
-`cargo test`
+```bash
+open QuillFix.app
+```
+
+## Full test suite
+
+```bash
+cargo test
+bash scripts/run_integration_tests.sh all
+```
 
 ## Notes
 
-Phase 6 scaffold is present and ready for implementation.
+- Includes integration/e2e test coverage for correction flow and guards.

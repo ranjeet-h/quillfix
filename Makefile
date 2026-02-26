@@ -26,7 +26,7 @@ lint:
 		-W clippy::unwrap_used
 
 test:
-	cargo test --workspace --no-default-features
+	QUILLFIX_STUB=1 cargo test --workspace --no-default-features
 
 build:
 	cargo build --workspace --no-default-features

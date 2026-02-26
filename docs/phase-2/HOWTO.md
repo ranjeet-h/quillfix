@@ -1,13 +1,17 @@
 # Phase 2 HOWTO
 
-## Build
+## Goal
 
-`cargo build`
+Implement QuillFix enable/disable state wiring with persistent defaults storage.
 
-## Test
+## Run tests
 
-`cargo test`
+```bash
+cargo test --test unit_menu_bar --test integration_menu_bar
+```
 
 ## Notes
 
-Phase 2 scaffold is present and ready for implementation.
+- `DEFAULTS_KEY` is `quillfix.enabled`.
+- Menu state is persisted using macOS `defaults` under domain `com.quillfix.app`.
+- Event monitor start/stop hooks are called when state flips.

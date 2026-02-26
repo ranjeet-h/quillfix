@@ -1,13 +1,24 @@
 # Phase 3 HOWTO
 
-## Build
+## Prerequisites
 
-`cargo build`
+- Accessibility permission granted to QuillFix in System Settings.
 
-## Test
+## Build + Run
 
-`cargo test`
+```bash
+bash scripts/bundle.sh
+open QuillFix.app
+```
 
-## Notes
+## Manual test
 
-Phase 3 scaffold is present and ready for implementation.
+- Open TextEdit and select text like `hello world`.
+- Verify monitor/debounce pipeline accepts only stable selections.
+
+## Run tests
+
+```bash
+cargo test --test unit_debounce --test integration_event_monitor
+bash scripts/run_integration_tests.sh phase3
+```

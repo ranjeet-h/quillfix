@@ -6,6 +6,7 @@ pub mod prompt;
 use anyhow::Result;
 use backend::LlmBackend;
 use prompt::CorrectionResult;
+use std::time::Instant;
 
 pub struct Corrector {
     backend: LlmBackend,
@@ -28,10 +29,19 @@ impl Corrector {
     /// # Errors
     /// Returns an error if `ensure_loaded` fails or inference returns an error.
     pub fn correct(&self, text: &str) -> Result<CorrectionResult> {
+        let started = Instant::now();
         self.backend.ensure_loaded()?;
         let prompt = prompt::build_prompt(text);
         let raw = self.backend.infer(&prompt)?;
-        Ok(prompt::post_process(text, &raw))
+        let result = prompt::post_process(text, &raw);
+        tracing::info!(
+            phase = "correct",
+            text_len = text.len(),
+            latency_ms = u64::try_from(started.elapsed().as_millis()).unwrap_or(u64::MAX),
+            changed = matches!(result, CorrectionResult::Changed(_)),
+            "correction completed"
+        );
+        Ok(result)
     }
 
     /// Pre-warm the backend (load model / spawn Python subprocess).

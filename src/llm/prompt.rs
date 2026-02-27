@@ -7,6 +7,15 @@ pub enum CorrectionResult {
     Error(String),
 }
 
+const META_PREFIXES: [&str; 6] = [
+    "here is the corrected text",
+    "corrected text:",
+    "assistant:",
+    "output:",
+    "i corrected",
+    "i fixed",
+];
+
 #[must_use]
 pub fn build_prompt(text: &str) -> String {
     // Few-shot ChatML prompt — empirically validated on Qwen2.5-1.5B-Instruct-4bit.
@@ -46,8 +55,21 @@ pub fn post_process(original: &str, generated: &str) -> CorrectionResult {
         return CorrectionResult::Error("empty output".to_string());
     }
 
+    let cleaned_lower = cleaned.to_ascii_lowercase();
+    if META_PREFIXES.iter().any(|prefix| cleaned_lower.starts_with(prefix)) {
+        return CorrectionResult::Error("meta output".to_string());
+    }
+
     if cleaned == original.trim() {
         return CorrectionResult::Unchanged;
+    }
+
+    if original.contains('\n') && original.lines().count() != cleaned.lines().count() {
+        return CorrectionResult::Error("format changed".to_string());
+    }
+
+    if has_protected_token_loss(original, cleaned) {
+        return CorrectionResult::Error("protected token changed".to_string());
     }
 
     if cleaned.len() > original.len().saturating_mul(3) {
@@ -55,4 +77,21 @@ pub fn post_process(original: &str, generated: &str) -> CorrectionResult {
     }
 
     CorrectionResult::Changed(cleaned.to_string())
+}
+
+fn has_protected_token_loss(original: &str, corrected: &str) -> bool {
+    original
+        .split_whitespace()
+        .filter(|token| is_protected_token(token))
+        .any(|token| !corrected.contains(token))
+}
+
+fn is_protected_token(token: &str) -> bool {
+    token.contains("://")
+        || token.contains('@')
+        || token.contains("::")
+        || token.contains('`')
+        || token.chars().any(|ch| {
+            matches!(ch, '{' | '}' | '[' | ']' | '(' | ')' | '<' | '>' | '/' | '\\' | '=')
+        })
 }

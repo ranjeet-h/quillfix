@@ -1,0 +1,10 @@
+[release_gates]
+minimum_success_rate = 0.98
+max_p95_latency_ms = 1200
+minimum_crash_free_runs = 0.995
+minimum_onboarding_completion = 0.9
+
+[notes]
+service_compatibility_matrix = "service_compatibility_matrix.csv"
+telemetry_required = true
+fallback_path_required = true

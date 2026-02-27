@@ -69,11 +69,26 @@ fn test_post_process_catches_explanation_added() {
 }
 
 #[test]
+fn test_post_process_rejects_meta_prefix_output() {
+    assert!(matches!(
+        post_process("teh cat", "Here is the corrected text: the cat"),
+        CorrectionResult::Error(_)
+    ));
+}
+
+#[test]
 fn test_post_process_catches_quoted_output() {
     let original = "I hav a idea";
     let bad_output =
         "\"I have an idea\" - I corrected 'hav' to 'have' and 'a' to 'an' before a vowel.";
     assert!(matches!(post_process(original, bad_output), CorrectionResult::Error(_)));
+}
+
+#[test]
+fn test_post_process_rejects_protected_token_loss() {
+    let original = "Open https://example.com and check teh docs";
+    let output = "Open and check the docs";
+    assert!(matches!(post_process(original, output), CorrectionResult::Error(_)));
 }
 
 #[test]

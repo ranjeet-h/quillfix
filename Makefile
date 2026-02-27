@@ -1,6 +1,6 @@
 SHELL := /bin/bash
 
-.PHONY: help fmt lint test build check-all check-all-llm
+.PHONY: help fmt lint test build dmg check-all check-all-llm
 
 help:
 	@echo "Targets:"
@@ -8,6 +8,7 @@ help:
 	@echo "  make lint          - Run clippy lint checks"
 	@echo "  make test          - Run tests"
 	@echo "  make build         - Build project"
+	@echo "  make dmg           - Build signed app bundle and DMG installer"
 	@echo "  make check-all     - fmt -> lint -> test -> build"
 	@echo "  make check-all-llm - fmt -> lint -> test -> build with local-llm feature"
 
@@ -30,6 +31,9 @@ test:
 
 build:
 	cargo build --workspace --no-default-features
+
+dmg:
+	bash scripts/create_dmg.sh
 
 check-all: fmt lint test build
 

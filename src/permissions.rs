@@ -106,6 +106,7 @@ pub fn run_first_launch_onboarding(timeout: Duration, poll_interval: Duration) -
 
     if accessibility_state() == PermissionState::Granted {
         save_onboarded_state(true);
+        show_services_hint_alert();
         return true;
     }
 
@@ -118,6 +119,7 @@ pub fn run_first_launch_onboarding(timeout: Duration, poll_interval: Duration) -
     while Instant::now() < deadline {
         if accessibility_state() == PermissionState::Granted {
             save_onboarded_state(true);
+            show_services_hint_alert();
             return true;
         }
         std::thread::sleep(poll_interval);
@@ -148,3 +150,23 @@ fn show_onboarding_alert() -> bool {
 fn show_onboarding_alert() -> bool {
     true
 }
+
+#[cfg(target_os = "macos")]
+fn show_services_hint_alert() {
+    let Some(mtm) = MainThreadMarker::new() else {
+        return;
+    };
+
+    let alert = NSAlert::new(mtm);
+    alert.setAlertStyle(NSAlertStyle::Informational);
+    alert.setMessageText(&NSString::from_str("QuillFix Setup Complete"));
+    alert.setInformativeText(&NSString::from_str(
+        "You can now use \"Correct with QuillFix\" from right-click > Services in supported apps. \
+If Services is unavailable, use the QuillFix menu bar item \"Correct Clipboard Text\" as fallback.",
+    ));
+    alert.addButtonWithTitle(&NSString::from_str("Got it"));
+    let _ = alert.runModal();
+}
+
+#[cfg(not(target_os = "macos"))]
+fn show_services_hint_alert() {}

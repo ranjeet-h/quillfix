@@ -1,7 +1,7 @@
 //! Shared global LLM corrector instance.
 //!
 //! Initialised once at startup and pre-warmed on a background thread.
-//! Both the menu-bar action and the NSServices handler access it here.
+//! Both the menu-bar action and the `NSServices` handler access it here.
 
 use std::sync::{Arc, Mutex, OnceLock};
 

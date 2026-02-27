@@ -39,6 +39,12 @@ Or run the one-shot local quality gate:
 make check-all
 ```
 
+Create a distributable DMG installer:
+
+```bash
+make dmg
+```
+
 Full local-LLM build (requires full Xcode Metal toolchain):
 
 ```bash
@@ -48,8 +54,9 @@ cargo build --release --features local-llm
 
 ## Scripts
 
-- `scripts/download_model.sh`: downloads `mlx-community/Qwen2.5-0.5B-Instruct-4bit` into `resources/model/`
+- `scripts/download_model.sh`: downloads `mlx-community/Qwen2.5-1.5B-Instruct-4bit` into `resources/model/`
 - `scripts/bundle.sh`: builds and bundles `QuillFix.app`, then signs it
+- `scripts/create_dmg.sh`: builds `QuillFix.app` and packages `dist/QuillFix-<version>.dmg`
 - `scripts/run_integration_tests.sh`: phase-scoped test entrypoint
 
 ## Notes

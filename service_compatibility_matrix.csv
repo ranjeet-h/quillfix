@@ -1,0 +1,8 @@
+app,category,services_menu_expected,validation_status,notes
+TextEdit,Apple,true,pending,Reference baseline app for manual validation.
+Notes,Apple,true,pending,Validate plain-text roundtrip and unchanged output path.
+Safari,Browser,true,pending,Check service invocation from editable fields.
+Google Chrome,Browser,true,pending,Confirm service visibility in contentEditable inputs.
+Visual Studio Code,Electron,mixed,pending,Test fallback path when Services is not surfaced.
+Slack,Electron,mixed,pending,Verify selected text handling in message composer.
+Microsoft Word,Office,mixed,pending,Check Services availability in document editing surface.

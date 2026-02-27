@@ -7,6 +7,7 @@ use std::io::{BufRead, BufReader, BufWriter, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::sync::{Arc, Mutex};
+use std::time::{Duration, Instant};
 
 #[cfg(feature = "local-llm")]
 use candle_core::{DType, Device, Tensor};
@@ -69,9 +70,82 @@ impl Default for LlmBackend {
 }
 
 impl LlmBackend {
+    const DEFAULT_READY_TIMEOUT_MS: u64 = 60_000;
+    const DEFAULT_REQUEST_TIMEOUT_MS: u64 = 12_000;
+
     #[must_use]
     pub fn new() -> Self {
         Self { state: Arc::new(Mutex::new(BackendState::new())) }
+    }
+
+    fn env_timeout_ms(key: &str, default_ms: u64) -> Duration {
+        let ms = std::env::var(key)
+            .ok()
+            .and_then(|v| v.parse::<u64>().ok())
+            .filter(|ms| *ms > 0)
+            .unwrap_or(default_ms);
+        Duration::from_millis(ms)
+    }
+
+    fn reset_python_process(state: &mut BackendState) {
+        if let Some(mut proc) = state.python.take() {
+            let _ = proc.child.kill();
+            let _ = proc.child.wait();
+        }
+    }
+
+    #[cfg(unix)]
+    fn wait_stdout_with_timeout(
+        stdout: &std::process::ChildStdout,
+        timeout: Duration,
+    ) -> Result<()> {
+        use std::os::fd::AsRawFd;
+
+        let timeout_ms_u128 = timeout.as_millis().min(i32::MAX as u128);
+        let timeout_ms = i32::try_from(timeout_ms_u128).unwrap_or(i32::MAX);
+        let mut poll_fd = libc::pollfd { fd: stdout.as_raw_fd(), events: libc::POLLIN, revents: 0 };
+        // SAFETY: `poll_fd` points to valid memory and has a single entry.
+        let rc = unsafe { libc::poll(&raw mut poll_fd, 1, timeout_ms) };
+        if rc == 0 {
+            return Err(anyhow!("timed out waiting for Python response"));
+        }
+        if rc < 0 {
+            return Err(anyhow!(
+                "failed waiting for Python response: {}",
+                std::io::Error::last_os_error()
+            ));
+        }
+        if (poll_fd.revents & (libc::POLLERR | libc::POLLHUP | libc::POLLNVAL)) != 0 {
+            return Err(anyhow!("Python subprocess stream closed"));
+        }
+        Ok(())
+    }
+
+    #[cfg(not(unix))]
+    fn wait_stdout_with_timeout(
+        _stdout: &std::process::ChildStdout,
+        _timeout: Duration,
+    ) -> Result<()> {
+        Ok(())
+    }
+
+    fn read_line_with_timeout(
+        reader: &mut BufReader<std::process::ChildStdout>,
+        timeout: Duration,
+    ) -> Result<String> {
+        Self::wait_stdout_with_timeout(reader.get_ref(), timeout)?;
+        let mut line = String::new();
+        reader
+            .read_line(&mut line)
+            .map_err(|e| anyhow!("failed reading from Python stdout: {e}"))?;
+        if line.trim().is_empty() {
+            return Err(anyhow!("empty response from Python subprocess"));
+        }
+        Ok(line)
+    }
+
+    fn elapsed_ms(start: Instant) -> u64 {
+        u64::try_from(start.elapsed().as_millis()).unwrap_or(u64::MAX)
     }
 
     /// Resolve the model directory: prefer the `.app` bundle path, fall back to cwd.
@@ -120,23 +194,21 @@ impl LlmBackend {
 
     /// Spawn the Python MLX inference subprocess and wait for its ready signal.
     fn spawn_python(venv: &Path) -> Result<PythonProcess> {
+        let start = Instant::now();
         let python = venv.join("bin").join("python3");
         let script = venv.join("infer.py");
         if !script.exists() {
-            // infer.py may live at project root's python-inference/infer.py
-            let alt = venv.join("infer.py");
-            if !alt.exists() {
-                return Err(anyhow!("infer.py not found in {}", venv.display()));
-            }
+            return Err(anyhow!("infer.py not found in {}", venv.display()));
         }
 
-        let mut child = Command::new(&python)
-            .arg(&script)
-            .stdin(Stdio::piped())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::inherit()) // model loading logs go to stderr
-            .spawn()
-            .map_err(|e| anyhow!("failed to spawn Python subprocess: {e}"))?;
+        let mut command = Command::new(&python);
+        command.arg(&script).stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::inherit()); // model loading logs go to stderr
+        if let Ok(exe_path) = std::env::current_exe() {
+            command.env("QUILLFIX_EXE_PATH", exe_path);
+        }
+
+        let mut child =
+            command.spawn().map_err(|e| anyhow!("failed to spawn Python subprocess: {e}"))?;
 
         let child_stdin = child.stdin.take().ok_or_else(|| anyhow!("no stdin pipe"))?;
         let child_stdout = child.stdout.take().ok_or_else(|| anyhow!("no stdout pipe"))?;
@@ -144,18 +216,33 @@ impl LlmBackend {
         let mut stdout_reader = BufReader::new(child_stdout);
 
         // Wait for {"ready":true} signal (with timeout)
-        let mut ready_line = String::new();
-        stdout_reader
-            .read_line(&mut ready_line)
-            .map_err(|e| anyhow!("failed reading ready signal from Python: {e}"))?;
+        let ready_timeout =
+            Self::env_timeout_ms("QUILLFIX_READY_TIMEOUT_MS", Self::DEFAULT_READY_TIMEOUT_MS);
+        let ready_line = match Self::read_line_with_timeout(&mut stdout_reader, ready_timeout) {
+            Ok(line) => line,
+            Err(e) => {
+                let _ = child.kill();
+                let _ = child.wait();
+                return Err(anyhow!(
+                    "Python subprocess did not become ready in {} ms: {e}",
+                    ready_timeout.as_millis()
+                ));
+            }
+        };
 
         let ready: serde_json::Value = serde_json::from_str(ready_line.trim())
             .map_err(|e| anyhow!("invalid ready signal: {e} (got: {ready_line})"))?;
         if ready.get("ready").and_then(serde_json::Value::as_bool) != Some(true) {
+            let _ = child.kill();
+            let _ = child.wait();
             return Err(anyhow!("unexpected ready signal: {ready_line}"));
         }
 
-        tracing::info!(phase = "llm", "Python MLX subprocess ready");
+        tracing::info!(
+            phase = "llm",
+            startup_ms = Self::elapsed_ms(start),
+            "Python MLX subprocess ready"
+        );
 
         Ok(PythonProcess { child, stdin: BufWriter::new(child_stdin), stdout: stdout_reader })
     }
@@ -168,6 +255,7 @@ impl LlmBackend {
     /// # Errors
     /// Returns an error if weights are missing or the model cannot be built.
     pub fn ensure_loaded(&self) -> Result<()> {
+        let started = Instant::now();
         let already = {
             let s = self.state.lock().map_err(|_| anyhow!("state lock poisoned"))?;
             s.loaded
@@ -189,6 +277,12 @@ impl LlmBackend {
                     s.model_path = Some(path);
                     s.python = Some(proc);
                     drop(s);
+                    tracing::info!(
+                        phase = "llm",
+                        backend = "python",
+                        load_ms = Self::elapsed_ms(started),
+                        "backend ready"
+                    );
                     return Ok(());
                 }
                 Err(e) => {
@@ -204,6 +298,12 @@ impl LlmBackend {
         s.loaded = true;
         s.model_path = Some(path);
         drop(s);
+        tracing::info!(
+            phase = "llm",
+            backend = if cfg!(feature = "local-llm") { "candle" } else { "stub" },
+            load_ms = Self::elapsed_ms(started),
+            "backend ready"
+        );
         Ok(())
     }
 
@@ -272,15 +372,14 @@ impl LlmBackend {
 
     /// Send a request to the Python subprocess and read the response.
     fn infer_python(proc: &mut PythonProcess, text: &str) -> Result<String> {
+        let request_timeout =
+            Self::env_timeout_ms("QUILLFIX_REQUEST_TIMEOUT_MS", Self::DEFAULT_REQUEST_TIMEOUT_MS);
         let request = serde_json::json!({"text": text});
         writeln!(proc.stdin, "{request}")
             .map_err(|e| anyhow!("failed writing to Python stdin: {e}"))?;
         proc.stdin.flush().map_err(|e| anyhow!("failed flushing Python stdin: {e}"))?;
 
-        let mut response_line = String::new();
-        proc.stdout
-            .read_line(&mut response_line)
-            .map_err(|e| anyhow!("failed reading from Python stdout: {e}"))?;
+        let response_line = Self::read_line_with_timeout(&mut proc.stdout, request_timeout)?;
 
         let resp: serde_json::Value = serde_json::from_str(response_line.trim())
             .map_err(|e| anyhow!("invalid JSON from Python: {e} (got: {response_line})"))?;
@@ -305,30 +404,118 @@ impl LlmBackend {
     /// # Errors
     /// Returns an error if inference fails.
     pub fn infer(&self, prompt: &str) -> Result<String> {
+        let started = Instant::now();
         // Extract user text from the ChatML prompt for the Python IPC
         let user_text = Self::extract_user_text(prompt);
 
-        {
+        let python_result = {
             let mut s = self.state.lock().map_err(|_| anyhow!("state lock poisoned"))?;
             if let Some(ref mut proc) = s.python {
-                return Self::infer_python(proc, &user_text);
+                if let Ok(Some(status)) = proc.child.try_wait() {
+                    tracing::warn!(phase = "llm", ?status, "python subprocess exited unexpectedly");
+                    Self::reset_python_process(&mut s);
+                    None
+                } else {
+                    Some(Self::infer_python(proc, &user_text))
+                }
+            } else {
+                None
+            }
+        };
+
+        if let Some(result) = python_result {
+            match result {
+                Ok(corrected) => {
+                    tracing::info!(
+                        phase = "llm",
+                        backend = "python",
+                        text_len = user_text.len(),
+                        latency_ms = Self::elapsed_ms(started),
+                        "inference ok"
+                    );
+                    return Ok(corrected);
+                }
+                Err(first_err) => {
+                    tracing::warn!(
+                        phase = "llm",
+                        ?first_err,
+                        "python inference failed; restarting"
+                    );
+                    {
+                        let mut s =
+                            self.state.lock().map_err(|_| anyhow!("state lock poisoned"))?;
+                        Self::reset_python_process(&mut s);
+                        s.loaded = false;
+                    }
+                    self.ensure_loaded()?;
+                    let retry = {
+                        let mut s =
+                            self.state.lock().map_err(|_| anyhow!("state lock poisoned"))?;
+                        s.python.as_mut().map_or_else(
+                            || Err(anyhow!("python backend unavailable after restart")),
+                            |proc| Self::infer_python(proc, &user_text),
+                        )
+                    };
+                    match retry {
+                        Ok(corrected) => {
+                            tracing::info!(
+                                phase = "llm",
+                                backend = "python-retry",
+                                text_len = user_text.len(),
+                                latency_ms = Self::elapsed_ms(started),
+                                "inference ok"
+                            );
+                            return Ok(corrected);
+                        }
+                        Err(retry_err) => {
+                            tracing::warn!(
+                                phase = "llm",
+                                ?retry_err,
+                                "python retry failed; falling back to alternate backend"
+                            );
+                            let mut s =
+                                self.state.lock().map_err(|_| anyhow!("state lock poisoned"))?;
+                            Self::reset_python_process(&mut s);
+                            s.python = None;
+                        }
+                    }
+                }
             }
         }
 
         #[cfg(feature = "local-llm")]
         {
-            return self.infer_real(prompt);
+            let result = self.infer_real(prompt);
+            if result.is_ok() {
+                tracing::info!(
+                    phase = "llm",
+                    backend = "candle",
+                    text_len = user_text.len(),
+                    latency_ms = Self::elapsed_ms(started),
+                    "inference ok"
+                );
+            }
+            return result;
         }
 
         #[cfg(not(feature = "local-llm"))]
         {
-            Ok(Self::infer_stub(prompt))
+            let corrected = Self::infer_stub(prompt);
+            tracing::info!(
+                phase = "llm",
+                backend = "stub",
+                text_len = user_text.len(),
+                latency_ms = Self::elapsed_ms(started),
+                "inference ok"
+            );
+            Ok(corrected)
         }
     }
 
     #[cfg(not(feature = "local-llm"))]
     fn infer_stub(prompt: &str) -> String {
-        let lower = prompt.to_lowercase();
+        let user_text = Self::extract_user_text(prompt);
+        let lower = user_text.to_lowercase();
 
         // Spelling corrections
         if lower.contains("teh quik brwon fox") {
@@ -344,26 +531,24 @@ impl LlmBackend {
             return "This is wrong".to_string();
         }
         if lower.contains("recieve") && lower.contains("seperate") {
-            return Self::extract_user_text(prompt)
-                .replace("recieve", "receive")
-                .replace("seperate", "separate");
+            return user_text.replace("recieve", "receive").replace("seperate", "separate");
         }
         if lower.contains("definately") {
-            return Self::extract_user_text(prompt).replace("definately", "definitely");
+            return user_text.replace("definately", "definitely");
         }
         if lower.contains("occured") {
-            return Self::extract_user_text(prompt).replace("occured", "occurred");
+            return user_text.replace("occured", "occurred");
         }
 
         // Grammar corrections
         if lower.contains("she dont") {
-            return Self::extract_user_text(prompt).replace("dont", "doesn't");
+            return user_text.replace("dont", "doesn't");
         }
         if lower.contains("him and me went") {
-            return Self::extract_user_text(prompt).replace("him and me went", "he and I went");
+            return user_text.replace("him and me went", "he and I went");
         }
         if lower.contains("their going to") {
-            return Self::extract_user_text(prompt).replace("their going to", "they're going to");
+            return user_text.replace("their going to", "they're going to");
         }
 
         // Punctuation corrections
@@ -372,7 +557,7 @@ impl LlmBackend {
         }
 
         // Return the user-turn text unchanged (simulates "no correction needed")
-        Self::extract_user_text(prompt)
+        user_text
     }
 
     fn extract_user_text(prompt: &str) -> String {

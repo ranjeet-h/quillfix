@@ -54,7 +54,7 @@ cargo build --release --features local-llm
 
 ## Scripts
 
-- `scripts/download_model.sh`: downloads `mlx-community/Qwen2.5-1.5B-Instruct-4bit` into `resources/model/`
+- `scripts/download_model.sh`: downloads `mlx-community/Qwen3.5-0.8B-MLX-8bit` into `resources/model/`
 - `scripts/bundle.sh`: builds and bundles `QuillFix.app`, then signs it
 - `scripts/create_dmg.sh`: builds `QuillFix.app` and packages `dist/QuillFix-<version>.dmg`
 - `scripts/run_integration_tests.sh`: phase-scoped test entrypoint
@@ -64,7 +64,5 @@ cargo build --release --features local-llm
 - `resources/model/` is gitignored.
 - `build.rs` links required macOS frameworks for AppKit/CoreGraphics/AX APIs.
 - `make check-all-llm` runs lint/test/build with `--features local-llm` (requires full Xcode + Metal tools).
-
-
 
 pkill -x quillfix; sleep 1 && bash scripts/bundle.sh && open QuillFix.app

@@ -13,10 +13,12 @@ fn test_build_prompt_contains_system_instruction() {
 #[test]
 fn test_build_prompt_restricts_to_spelling_grammar_punctuation() {
     let prompt = build_prompt("anything");
-    assert!(prompt.contains("Fix every spelling mistake"));
+    assert!(prompt.contains("Always fix: spelling"));
     assert!(prompt.contains("Output ONLY the corrected text"));
-    assert!(prompt.contains("do NOT rephrase"));
-    assert!(prompt.contains("nothing else"));
+    assert!(prompt.contains("Do not explain"));
+    assert!(prompt.contains("minimum necessary edits"));
+    assert!(prompt.contains("there/their/they're"));
+    assert!(prompt.contains("technical terms"));
 }
 
 #[test]

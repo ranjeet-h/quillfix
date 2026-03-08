@@ -318,8 +318,45 @@ impl LlmBackend {
         let config_path = path.join("config.json");
         let config_str = fs::read_to_string(&config_path)
             .with_context(|| format!("reading config from {}", config_path.display()))?;
+        let mut config_json: serde_json::Value = serde_json::from_str(&config_str)
+            .with_context(|| "parsing config.json as generic json")?;
+
+        // Qwen3.5 puts language model properties inside text_config, but Candle's Qwen2Config expects them at the root.
+        let text_config_clone = config_json.get("text_config").cloned();
+        if let Some(serde_json::Value::Object(text_config)) = text_config_clone {
+            let config_obj = config_json.as_object_mut().unwrap();
+            for (key, value) in text_config {
+                if !config_obj.contains_key(&key) {
+                    config_obj.insert(key, value);
+                }
+            }
+        }
+
+        // Qwen2Config in candle explicitly looks for `sliding_window` but Qwen3.5 may not provide it if it's default
+        if let Some(config_obj) = config_json.as_object_mut() {
+            if !config_obj.contains_key("sliding_window") {
+                config_obj.insert("sliding_window".to_string(), serde_json::json!(32768));
+            }
+            if !config_obj.contains_key("max_window_layers") {
+                config_obj.insert("max_window_layers".to_string(), serde_json::json!(21));
+            }
+            if !config_obj.contains_key("hidden_size") {
+                // Extracted from typical Qwen 0.5/0.8B configs if missing, but it should be there.
+                config_obj.insert("hidden_size".to_string(), serde_json::json!(1536));
+            }
+            // Qwen3.5 nests rope_theta under rope_parameters
+            if !config_obj.contains_key("rope_theta") {
+                let rope_theta = config_obj
+                    .get("rope_parameters")
+                    .and_then(|rp| rp.get("rope_theta"))
+                    .cloned()
+                    .unwrap_or(serde_json::json!(10000.0));
+                config_obj.insert("rope_theta".to_string(), rope_theta);
+            }
+        }
+
         let config: Qwen2Config =
-            serde_json::from_str(&config_str).with_context(|| "parsing config.json")?;
+            serde_json::from_value(config_json).with_context(|| "parsing modified config.json")?;
 
         let tokenizer_path = path.join("tokenizer.json");
         let tokenizer =
@@ -348,7 +385,7 @@ impl LlmBackend {
         };
 
         let mut model =
-            ModelForCausalLM::new(&config, vb).with_context(|| "building Qwen2 model")?;
+            ModelForCausalLM::new(&config, vb).with_context(|| "building Qwen3.5 model")?;
 
         // Pre-warm: compile Metal/ANE pipeline with a single-token pass
         let dummy = Tensor::zeros((1, 1), DType::U32, &device)
@@ -359,7 +396,7 @@ impl LlmBackend {
         let eos_token_id = tokenizer
             .token_to_id("<|im_end|>")
             .or_else(|| tokenizer.token_to_id("</s>"))
-            .unwrap_or(151_645_u32); // Qwen2 default EOS
+            .unwrap_or(151_645_u32); // Qwen3.5 default EOS
 
         let mut s = self.state.lock().map_err(|_| anyhow!("state lock poisoned"))?;
         s.inner = Some(Box::new(Qwen2Inner { model, tokenizer, device, eos_token_id }));

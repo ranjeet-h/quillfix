@@ -9,6 +9,7 @@ QuillFix is a macOS menu bar application that provides one-click grammar and spe
 ### Core Components
 
 #### 1. Main Application (`src/main.rs`)
+
 - **Entry Point**: Application initialization and lifecycle management
 - **Permission Management**: Accessibility permissions check and onboarding
 - **Background Pre-warming**: LLM backend initialization on background thread
@@ -16,26 +17,30 @@ QuillFix is a macOS menu bar application that provides one-click grammar and spe
 - **NSServices Registration**: System-wide service integration
 
 #### 2. Text Correction Engine (`src/corrector.rs`, `src/llm/`)
+
 - **Global Corrector Instance**: Thread-safe singleton pattern using `Arc<Mutex<Corrector>>`
-- **Multi-Backend Support**: 
+- **Multi-Backend Support**:
   - Python MLX subprocess (primary)
   - Rust Candle implementation (local-llm feature)
   - Deterministic stub (testing/fallback)
 - **Backend Abstraction**: Unified interface for different inference backends
 
 #### 3. LLM Backend (`src/llm/backend.rs`)
+
 - **Python MLX Integration**: Subprocess communication via JSON IPC
 - **Candle Implementation**: Native Rust ML inference with Metal acceleration
 - **Model Management**: Loading, caching, and lifecycle management
 - **Fallback Strategy**: Graceful degradation between backends
 
 #### 4. Menu Bar Interface (`src/menu_bar.rs`)
+
 - **Native macOS Integration**: Objective-C bindings via objc2
 - **System Status Item**: Menu bar icon and dropdown menu
 - **User Preferences**: Toggle enable/disable, launch at login
 - **Accessibility Settings**: Direct link to system preferences
 
 #### 5. Python Inference Server (`python-inference/infer.py`)
+
 - **MLX Model Loading**: Apple MLX framework for efficient inference
 - **JSON IPC Protocol**: Stdin/stdout communication with Rust backend
 - **Prompt Engineering**: System prompts for grammar/spelling correction
@@ -44,6 +49,7 @@ QuillFix is a macOS menu bar application that provides one-click grammar and spe
 ## Technology Stack
 
 ### Rust Core
+
 - **Edition**: Rust 2024 Edition (rustc 1.93.1+)
 - **Async Runtime**: Tokio for concurrent operations
 - **Logging**: tracing with macOS OSLog integration
@@ -51,18 +57,21 @@ QuillFix is a macOS menu bar application that provides one-click grammar and spe
 - **Serialization**: serde/serde_json for data interchange
 
 ### macOS Integration
+
 - **Frameworks**: AppKit, CoreGraphics, CoreFoundation, ApplicationServices, Accessibility
 - **Objective-C Bindings**: objc2 crate for safe Objective-C interop
 - **System Services**: NSServices for system-wide text correction
 - **Menu Bar**: NSStatusBar and NSMenu for native UI
 
 ### Machine Learning
-- **Primary Backend**: Python MLX with mlx-lm
+
+- **Primary Backend**: Python MLX with mlx-vlm
 - **Native Backend**: Candle with Metal acceleration (optional)
-- **Model**: Qwen2.5-1.5B-Instruct-4bit (Hugging Face)
+- **Model**: Qwen3.5-0.8B-MLX-8bit (Hugging Face)
 - **Tokenization**: Hugging Face tokenizers
 
 ### Development Tools
+
 - **Build System**: Cargo with custom build.rs for framework linking
 - **Code Quality**: rustfmt, clippy with strict linting rules
 - **Testing**: Unit and integration tests with deterministic stub
@@ -107,23 +116,27 @@ quillfix/
 ## Key Features
 
 ### 1. System Integration
+
 - **Menu Bar Application**: Native macOS menu bar interface
 - **NSServices**: "Correct with QuillFix" in system services menu
 - **Accessibility API**: Text selection and correction
 - **Launch at Login**: Optional auto-start functionality
 
 ### 2. Multi-Backend Architecture
+
 - **Python MLX**: Primary backend with Apple Silicon optimization
 - **Rust Candle**: Native Rust implementation with Metal support
 - **Fallback Stub**: Deterministic corrections for testing/offline use
 
 ### 3. Performance Optimizations
+
 - **Background Pre-warming**: Model loading on startup
 - **Process Isolation**: Separate Python process for ML inference
 - **Caching**: Persistent model and tokenizer caching
 - **Metal Acceleration**: GPU acceleration for Apple Silicon
 
 ### 4. User Experience
+
 - **One-Click Correction**: Simple text selection and correction
 - **Real-time Feedback**: Immediate correction results
 - **Privacy-First**: Local processing ensures text privacy
@@ -132,6 +145,7 @@ quillfix/
 ## Build and Deployment
 
 ### Development Build
+
 ```bash
 cargo check                    # Basic compilation check
 cargo test                     # Run tests (with stub backend)
@@ -139,12 +153,14 @@ make check-all                # Full quality gate
 ```
 
 ### Production Build
+
 ```bash
 make dmg                       # Build signed app and DMG
 cargo build --release --features local-llm  # Full ML build
 ```
 
 ### Dependencies
+
 - **Rust Toolchain**: Stable with Edition 2024 support
 - **macOS**: Version 14+ required
 - **Xcode**: Full installation for MLX/Metal compilation
@@ -154,11 +170,13 @@ cargo build --release --features local-llm  # Full ML build
 ## Security and Privacy
 
 ### Local Processing
+
 - **No Cloud Dependencies**: All processing happens locally
 - **Text Privacy**: No text sent to external services
 - **Sandboxing**: macOS app sandboxing support
 
 ### Permissions
+
 - **Accessibility**: Required for text selection access
 - **File System**: Model directory access
 - **Network**: Optional for model downloads only
@@ -166,16 +184,19 @@ cargo build --release --features local-llm  # Full ML build
 ## Testing Strategy
 
 ### Unit Tests
+
 - **Component Testing**: Individual module testing
 - **Mock Backends**: Deterministic stub for reliable testing
 - **Edge Cases**: Error handling and boundary conditions
 
 ### Integration Tests
+
 - **End-to-End**: Full correction workflow testing
 - **System Integration**: macOS accessibility testing
 - **Backend Compatibility**: Multiple backend validation
 
 ### Quality Gates
+
 - **Linting**: Strict clippy rules with pedantic checks
 - **Formatting**: Consistent code style with rustfmt
 - **Security**: Dependency vulnerability scanning
@@ -183,12 +204,14 @@ cargo build --release --features local-llm  # Full ML build
 ## Future Enhancements
 
 ### Planned Features
+
 - **Additional Models**: Support for different correction models
 - **Custom Prompts**: User-configurable correction styles
 - **Batch Processing**: Multiple text correction
 - **Statistics**: Usage analytics and correction history
 
 ### Technical Improvements
+
 - **Performance**: Further optimization of inference speed
 - **Memory**: Reduced memory footprint
 - **Compatibility**: Broader macOS version support
@@ -203,4 +226,4 @@ cargo build --release --features local-llm  # Full ML build
 
 ---
 
-*This summary provides a comprehensive overview of the QuillFix project architecture, technologies, and implementation details for developers and stakeholders.*
+_This summary provides a comprehensive overview of the QuillFix project architecture, technologies, and implementation details for developers and stakeholders._

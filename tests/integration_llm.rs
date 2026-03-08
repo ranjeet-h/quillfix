@@ -133,10 +133,11 @@ fn test_model_is_qwen2_architecture() {
         &std::fs::read_to_string(config_path).expect("config.json must be readable"),
     )
     .expect("config.json must be valid JSON");
-    assert_eq!(config["model_type"], "qwen2", "model must be Qwen2");
+    assert_eq!(config["model_type"], "qwen3_5", "model must be Qwen3_5");
+    // Qwen3.5 architecture checking
     assert_eq!(
-        config["architectures"][0], "Qwen2ForCausalLM",
-        "architecture must be Qwen2ForCausalLM"
+        config["architectures"][0], "Qwen3_5ForConditionalGeneration",
+        "architecture must be Qwen3_5ForConditionalGeneration"
     );
 }
 
@@ -145,7 +146,7 @@ fn test_download_script_references_correct_model() {
     let script =
         std::fs::read_to_string("scripts/download_model.sh").expect("download script must exist");
     assert!(
-        script.contains("mlx-community/Qwen2.5-1.5B-Instruct-4bit"),
+        script.contains("mlx-community/Qwen3.5-0.8B-MLX-8bit"),
         "download script must reference the correct model ID"
     );
 }

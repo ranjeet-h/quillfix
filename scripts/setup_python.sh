@@ -12,7 +12,7 @@ else
 fi
 
 echo "Installing dependencies..."
-"$VENV_DIR/bin/pip" install --upgrade pip
-"$VENV_DIR/bin/pip" install -r "$SCRIPT_DIR/python-inference/requirements.txt"
+"$VENV_DIR/bin/pip" install --no-cache-dir --upgrade pip
+"$VENV_DIR/bin/pip" install --no-cache-dir -r "$SCRIPT_DIR/python-inference/requirements.txt"
 
 echo "Setup complete. Run './python-inference/bin/python3 python-inference/infer.py' to test."
